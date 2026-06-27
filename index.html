@@ -6,21 +6,21 @@
     <title>Motor Tachometer Pro</title>
     <style>
         :root { --bg: #f2f2f7; --card: #ffffff; --accent: #007aff; }
-        body { background-color: var(--bg); font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: #1c1c1e; padding: 20px; margin: 0; }
-        .container { max-width: 100%; margin: auto; }
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
-        .box { background: var(--card); padding: 15px; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); text-align: center; }
-        .label { font-size: 0.7rem; color: #8e8e93; margin-bottom: 5px; }
-        .value { font-size: 1.2rem; font-weight: 800; }
-        .slider-box, .select-box { background: var(--card); padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .controls { display: flex; gap: 12px; margin-bottom: 20px; }
-        button { flex: 1; padding: 18px; border-radius: 14px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; }
+        body { background-color: var(--bg); font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: #1c1c1e; padding: 15px; margin: 0; }
+        .container { max-width: 500px; margin: auto; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
+        .box { background: var(--card); padding: 12px; border-radius: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; }
+        .label { font-size: 0.65rem; color: #8e8e93; margin-bottom: 2px; }
+        .value { font-size: 1rem; font-weight: 700; }
+        .slider-box, .select-box { background: var(--card); padding: 15px; border-radius: 16px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .controls { display: flex; gap: 8px; margin-bottom: 15px; }
+        button { flex: 1; padding: 15px; border-radius: 12px; border: none; font-weight: 700; cursor: pointer; }
         #startBtn { background: var(--accent); color: white; }
         #stopBtn { background: #ff3b30; color: white; }
         #resetBtn { background: #e5e5ea; }
-        select { width: 100%; padding: 10px; border-radius: 10px; font-size: 1rem; border: 1px solid #ddd; }
-        #canvas { width: 100%; height: 180px; background: #000; border-radius: 16px; display: block; touch-action: none; }
-        .axis-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: #8e8e93; padding: 10px 5px; }
+        select { width: 100%; padding: 12px; border-radius: 10px; font-size: 1rem; border: 1px solid #ccc; }
+        #canvas { width: 100%; height: 150px; background: #000; border-radius: 16px; display: block; touch-action: none; }
+        .axis-labels { display: flex; justify-content: space-between; font-size: 0.6rem; color: #8e8e93; padding: 5px 5px 0; }
     </style>
 </head>
 <body>
@@ -28,9 +28,9 @@
 <div class="container">
     <div class="slider-box">
         <div class="label">タイヤ外径: <span id="tireVal">26.0</span>mm</div>
-        <input type="range" id="tireSlider" min="22.0" max="35.0" step="0.1" value="26.0" style="width: 100%; height: 30px;">
+        <input type="range" id="tireSlider" min="22.0" max="35.0" step="0.1" value="26.0" style="width: 100%;">
     </div>
-    
+
     <div class="select-box">
         <div class="label">ギア比選択</div>
         <select id="gearSelect">
@@ -64,11 +64,12 @@
     <div class="axis-labels">
         <span>0</span><span>200</span><span>500</span><span>1k</span><span>2k</span><span>5k</span><span>10k</span><span>20k</span><span>40k</span><span>50k</span>
     </div>
-</
+</div>
+
 <script>
     const CONFIG = { SENSITIVITY: 128, MAX_RPM: 50000 };
     let audioCtx, analyser, dataArray, animationId, lastUpdate = 0;
-    let lastRpm = 0; // 最後に検知したRPM
+    let lastRpm = 0; // 最後に計測したRPMを保持
     const stats = { maxRpm: 0, minRpm: 999999, maxSpd: 0, minSpd: 999999 };
 
     const el = {
@@ -83,7 +84,14 @@
     const ctx = el.canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
 
-    // 共通の速度計算関数
+    function resizeCanvas() {
+        el.canvas.width = el.canvas.offsetWidth * dpr;
+        el.canvas.height = el.canvas.offsetHeight * dpr;
+        ctx.scale(dpr, dpr);
+    }
+    window.onload = resizeCanvas;
+
+    // 速度計算と更新を共通化
     function updateSpeedDisplay(rpm) {
         const gearRatio = parseFloat(el.gear.value);
         const tireRpm = rpm / gearRatio;
@@ -96,20 +104,34 @@
         el.spdMin.textContent = stats.minSpd.toFixed(1);
     }
 
-    // ギア比変更時に再計算
+    // 入力変更時の即時再計算
     el.gear.onchange = () => { if(lastRpm > 0) updateSpeedDisplay(lastRpm); };
-    el.tire.oninput = () => { el.tireVal.textContent = el.tire.value; if(lastRpm > 0) updateSpeedDisplay(lastRpm); };
+    el.tire.oninput = () => { 
+        el.tireVal.textContent = el.tire.value; 
+        if(lastRpm > 0) updateSpeedDisplay(lastRpm); 
+    };
 
-    // リセット処理
     el.reset.onclick = () => {
         lastRpm = 0; stats.maxRpm = 0; stats.minRpm = 999999; stats.maxSpd = 0; stats.minSpd = 999999;
         [el.rpmCur, el.rpmMax, el.rpmMin].forEach(e => e.textContent = "0");
         [el.spdCur, el.spdMax, el.spdMin].forEach(e => e.textContent = "0.0");
     };
 
-    // ... (中略: 初期設定やstart/stopボタンの処理は前回のものを使用)
-    
-    // update関数内の修正
+    el.start.onclick = async () => {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        await audioCtx.resume();
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 16384;
+        source.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        el.start.disabled = true; el.stop.disabled = false;
+        update();
+    };
+
+    el.stop.onclick = () => { cancelAnimationFrame(animationId); audioCtx.close(); el.start.disabled = false; el.stop.disabled = true; };
+
     function update(timestamp) {
         animationId = requestAnimationFrame(update);
         if (timestamp - lastUpdate < 50) return;
@@ -120,8 +142,17 @@
         ctx.clearRect(0, 0, cw, ch);
 
         let maxVal = 0, maxIndex = 0;
-        // ... (波形描画処理は同じ)
-        
+        ctx.beginPath();
+        ctx.strokeStyle = '#007aff';
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < dataArray.length; i++) {
+            if (dataArray[i] > maxVal) { maxVal = dataArray[i]; maxIndex = i; }
+            const x = (i / dataArray.length) * cw;
+            const y = ch - (Math.min(dataArray[i], CONFIG.SENSITIVITY) / CONFIG.SENSITIVITY) * ch;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
         const hz = Math.round(maxIndex * audioCtx.sampleRate / analyser.fftSize);
         if (hz > 50) {
             lastRpm = hz * 60;
@@ -134,10 +165,17 @@
             
             updateSpeedDisplay(lastRpm);
             
-            // ... (オーバーレイ描画)
+            const pos = (lastRpm / CONFIG.MAX_RPM) * cw;
+            ctx.strokeStyle = '#ff3b30';
+            ctx.lineWidth = 2.0;
+            ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, ch); ctx.stroke();
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(pos + 5, 5, 80, 20);
+            ctx.fillStyle = '#ff3b30';
+            ctx.fillText(`${lastRpm.toLocaleString()} RPM`, pos + 8, 20);
         }
     }
 </script>
-
 </body>
 </html>
