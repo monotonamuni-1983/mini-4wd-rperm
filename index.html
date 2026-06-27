@@ -2,78 +2,151 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Mini4WD Motor RPM Monitor</title>
+    <title>Motor Tachometer Pro</title>
     <style>
-        body { background: #1a1a1a; color: #ff0000; font-family: sans-serif; text-align: center; padding: 20px; }
-        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 400px; margin: auto; }
-        .box { border: 2px solid #ff0000; padding: 15px; border-radius: 8px; }
-        .label { font-size: 0.7rem; color: #fff; }
-        .value { font-size: 1.8rem; font-weight: bold; }
-        button { background: #ff0000; color: #fff; border: none; padding: 20px; font-size: 1.2rem; cursor: pointer; width: 100%; max-width: 400px; margin-bottom: 20px; border-radius: 8px; }
+        :root { --bg: #f2f2f7; --card: #ffffff; --accent: #007aff; }
+        body { background-color: var(--bg); font-family: -apple-system, sans-serif; color: #1c1c1e; padding: 15px; }
+        .container { max-width: 500px; margin: auto; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+        .box { background: var(--card); padding: 10px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; }
+        .label { font-size: 0.6rem; color: #8e8e93; margin-bottom: 2px; }
+        .value { font-size: 1rem; font-weight: 700; }
+        .slider-box { background: var(--card); padding: 15px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .controls { display: flex; gap: 8px; margin-bottom: 15px; }
+        button { flex: 1; padding: 10px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; }
+        #startBtn { background: var(--accent); color: white; }
+        #stopBtn { background: #ff3b30; color: white; }
+        #resetBtn { background: #e5e5ea; }
+        #canvas { width: 100%; height: 130px; background: #000; border-radius: 12px; display: block; }
+        .axis-labels { display: flex; justify-content: space-between; font-size: 0.6rem; color: #8e8e93; padding: 5px 5px 0; }
     </style>
 </head>
 <body>
 
-    <h1>MOTOR RPM MONITOR</h1>
-    <button id="startBtn">測定開始</button>
-
-    <div class="container">
-        <div class="box"><div class="label">リアルタイム (Hz)</div><div id="current" class="value">0</div></div>
-        <div class="box"><div class="label">換算回転数 (RPM)</div><div id="rpm" class="value">0</div></div>
-        <div class="box"><div class="label">平均 (Hz)</div><div id="avg" class="value">0</div></div>
-        <div class="box"><div class="label">最高 (Hz)</div><div id="max" class="value">0</div></div>
+<div class="container">
+    <div class="slider-box">
+        <div class="label">タイヤ外径: <span id="tireVal">26.0</span>mm</div>
+        <input type="range" id="tireSlider" min="22.0" max="35.0" step="0.1" value="26.0" style="width: 100%;">
+    </div>
+    <div class="controls">
+        <button id="startBtn">開始</button>
+        <button id="stopBtn" disabled>停止</button>
+        <button id="resetBtn">リセット</button>
     </div>
 
-    <script>
-        let audioCtx, analyser, dataArray;
-        let maxFreq = 0, sumFreq = 0, count = 0;
+    <div class="grid">
+        <div class="box"><div class="label">RPM(現)</div><div id="rpmCur" class="value">0</div></div>
+        <div class="box"><div class="label">RPM(高)</div><div id="rpmMax" class="value">0</div></div>
+        <div class="box"><div class="label">RPM(低)</div><div id="rpmMin" class="value">0</div></div>
+        <div class="box"><div class="label">速度(現)</div><div id="spdCur" class="value">0.0</div></div>
+        <div class="box"><div class="label">速度(高)</div><div id="spdMax" class="value">0.0</div></div>
+        <div class="box"><div class="label">速度(低)</div><div id="spdMin" class="value">0.0</div></div>
+    </div>
 
-        document.getElementById('startBtn').onclick = async () => {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const source = audioCtx.createMediaStreamSource(stream);
-            
-            analyser = audioCtx.createAnalyser();
-            // 周波数分解能を高めるためfftSizeを大きく設定
-            analyser.fftSize = 4096; 
-            source.connect(analyser);
-            
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
-            document.getElementById('startBtn').innerText = "測定中...";
-            update();
-        };
+    <canvas id="canvas"></canvas>
+    <div class="axis-labels">
+        <span>0</span><span>200</span><span>500</span><span>1k</span><span>2k</span><span>5k</span><span>10k</span><span>20k</span><span>40k</span><span>50k</span>
+    </div>
+</div>
 
-        function update() {
-            analyser.getByteFrequencyData(dataArray);
-            
-            let maxVal = 0, maxIndex = 0;
-            // 100Hz〜3000Hzの範囲を重点的に探索
-            const minBin = Math.floor(100 * analyser.fftSize / audioCtx.sampleRate);
-            const maxBin = Math.floor(3000 * analyser.fftSize / audioCtx.sampleRate);
-            
-            for (let i = minBin; i < maxBin; i++) {
-                if (dataArray[i] > maxVal) { 
-                    maxVal = dataArray[i]; 
-                    maxIndex = i; 
-                }
-            }
-            
-            const currentHz = Math.round(maxIndex * audioCtx.sampleRate / analyser.fftSize);
-            
-            if (currentHz >= 100) {
-                document.getElementById('current').innerText = currentHz;
-                // RPM換算: 1Hz = 60RPM
-                document.getElementById('rpm').innerText = currentHz * 60;
-                
-                maxFreq = Math.max(maxFreq, currentHz);
-                sumFreq += currentHz;
-                count++;
-                
-                document.getElementById('avg').innerText = Math.round(sumFreq / count);
-                document.getElementById('max').innerText = maxFreq;
-            }
-            requestAnimationFrame(update);
+<script>
+    const CONFIG = { SENSITIVITY: 128, MAX_RPM: 50000 };
+    let audioCtx, analyser, dataArray, animationId, lastUpdate = 0;
+    const stats = { maxRpm: 0, minRpm: 999999, maxSpd: 0, minSpd: 999999 };
+
+    const el = {
+        canvas: document.getElementById('canvas'),
+        rpmCur: document.getElementById('rpmCur'), rpmMax: document.getElementById('rpmMax'), rpmMin: document.getElementById('rpmMin'),
+        spdCur: document.getElementById('spdCur'), spdMax: document.getElementById('spdMax'), spdMin: document.getElementById('spdMin'),
+        tire: document.getElementById('tireSlider'), tireVal: document.getElementById('tireVal'),
+        start: document.getElementById('startBtn'), stop: document.getElementById('stopBtn'), reset: document.getElementById('resetBtn')
+    };
+
+    const ctx = el.canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+
+    window.onload = () => {
+        el.canvas.width = el.canvas.offsetWidth * dpr;
+        el.canvas.height = el.canvas.offsetHeight * dpr;
+        ctx.scale(dpr, dpr);
+    };
+
+    el.tire.oninput = () => el.tireVal.textContent = el.tire.value;
+    el.reset.onclick = () => {
+        stats.maxRpm = 0; stats.minRpm = 999999; stats.maxSpd = 0; stats.minSpd = 999999;
+        [el.rpmCur, el.rpmMax, el.rpmMin].forEach(e => e.textContent = "0");
+        [el.spdCur, el.spdMax, el.spdMin].forEach(e => e.textContent = "0.0");
+    };
+
+    el.start.onclick = async () => {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 16384;
+        source.connect(analyser);
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        el.start.disabled = true; el.stop.disabled = false;
+        update();
+    };
+
+    el.stop.onclick = () => { cancelAnimationFrame(animationId); audioCtx.close(); el.start.disabled = false; el.stop.disabled = true; };
+
+    function update(timestamp) {
+        animationId = requestAnimationFrame(update);
+        if (timestamp - lastUpdate < 50) return;
+        lastUpdate = timestamp;
+
+        analyser.getByteFrequencyData(dataArray);
+        const [cw, ch] = [el.canvas.width / dpr, el.canvas.height / dpr];
+        ctx.clearRect(0, 0, cw, ch);
+
+        let maxVal = 0, maxIndex = 0;
+        ctx.beginPath();
+        ctx.strokeStyle = '#007aff';
+        ctx.lineWidth = 0.75;
+        for (let i = 0; i < dataArray.length; i++) {
+            if (dataArray[i] > maxVal) { maxVal = dataArray[i]; maxIndex = i; }
+            const x = (i / dataArray.length) * cw;
+            const y = ch - (Math.min(dataArray[i], CONFIG.SENSITIVITY) / CONFIG.SENSITIVITY) * ch;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
         }
-    </script>
+        ctx.stroke();
+
+        const hz = Math.round(maxIndex * audioCtx.sampleRate / analyser.fftSize);
+        if (hz > 50) {
+            const rpm = hz * 60;
+            const spd = ((el.tire.value * Math.PI * rpm * 60) / 1000000);
+            
+            if (rpm > stats.maxRpm) stats.maxRpm = rpm;
+            if (rpm < stats.minRpm) stats.minRpm = rpm;
+            if (spd > stats.maxSpd) stats.maxSpd = spd;
+            if (spd < stats.minSpd) stats.minSpd = spd;
+
+            el.rpmCur.textContent = rpm.toLocaleString();
+            el.rpmMax.textContent = stats.maxRpm.toLocaleString();
+            el.rpmMin.textContent = stats.minRpm.toLocaleString();
+            el.spdCur.textContent = spd.toFixed(1);
+            el.spdMax.textContent = stats.maxSpd.toFixed(1);
+            el.spdMin.textContent = stats.minSpd.toFixed(1);
+
+            const pos = (rpm / CONFIG.MAX_RPM) * cw;
+            // 縦線の描画
+            ctx.strokeStyle = '#ff3b30';
+            ctx.lineWidth = 1.0;
+            ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, ch); ctx.stroke();
+
+            // 数値オーバーレイの背景と文字
+            const text = `${rpm.toLocaleString()} RPM`;
+            ctx.font = 'bold 12px monospace';
+            const textWidth = ctx.measureText(text).width;
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(pos + 5, 5, textWidth + 6, 16);
+            ctx.fillStyle = '#ff3b30';
+            ctx.fillText(text, pos + 8, 17);
+        }
+    }
+</script>
 </body>
 </html>
