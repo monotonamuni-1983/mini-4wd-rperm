@@ -64,11 +64,11 @@
     <div class="axis-labels">
         <span>0</span><span>200</span><span>500</span><span>1k</span><span>2k</span><span>5k</span><span>10k</span><span>20k</span><span>40k</span><span>50k</span>
     </div>
-</div>
-
+</
 <script>
     const CONFIG = { SENSITIVITY: 128, MAX_RPM: 50000 };
     let audioCtx, analyser, dataArray, animationId, lastUpdate = 0;
+    let lastRpm = 0; // 最後に検知したRPM
     const stats = { maxRpm: 0, minRpm: 999999, maxSpd: 0, minSpd: 999999 };
 
     const el = {
@@ -83,38 +83,33 @@
     const ctx = el.canvas.getContext('2d');
     const dpr = window.devicePixelRatio || 1;
 
-    function resizeCanvas() {
-        el.canvas.width = el.canvas.offsetWidth * dpr;
-        el.canvas.height = el.canvas.offsetHeight * dpr;
-        ctx.scale(dpr, dpr);
+    // 共通の速度計算関数
+    function updateSpeedDisplay(rpm) {
+        const gearRatio = parseFloat(el.gear.value);
+        const tireRpm = rpm / gearRatio;
+        const spd = (parseFloat(el.tire.value) * Math.PI * tireRpm * 60) / 1000000;
+        
+        el.spdCur.textContent = spd.toFixed(1);
+        if (spd > stats.maxSpd) stats.maxSpd = spd;
+        if (spd < stats.minSpd || stats.minSpd === 999999) stats.minSpd = spd;
+        el.spdMax.textContent = stats.maxSpd.toFixed(1);
+        el.spdMin.textContent = stats.minSpd.toFixed(1);
     }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
 
-    el.tire.oninput = () => el.tireVal.textContent = el.tire.value;
+    // ギア比変更時に再計算
+    el.gear.onchange = () => { if(lastRpm > 0) updateSpeedDisplay(lastRpm); };
+    el.tire.oninput = () => { el.tireVal.textContent = el.tire.value; if(lastRpm > 0) updateSpeedDisplay(lastRpm); };
+
+    // リセット処理
     el.reset.onclick = () => {
-        stats.maxRpm = 0; stats.minRpm = 999999; stats.maxSpd = 0; stats.minSpd = 999999;
+        lastRpm = 0; stats.maxRpm = 0; stats.minRpm = 999999; stats.maxSpd = 0; stats.minSpd = 999999;
         [el.rpmCur, el.rpmMax, el.rpmMin].forEach(e => e.textContent = "0");
         [el.spdCur, el.spdMax, el.spdMin].forEach(e => e.textContent = "0.0");
     };
 
-    el.start.onclick = async () => {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        await audioCtx.resume();
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const source = audioCtx.createMediaStreamSource(stream);
-            analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 16384;
-            source.connect(analyser);
-            dataArray = new Uint8Array(analyser.frequencyBinCount);
-            el.start.disabled = true; el.stop.disabled = false;
-            update();
-        } catch (err) { alert("マイクへのアクセスが拒否されました。"); }
-    };
-
-    el.stop.onclick = () => { cancelAnimationFrame(animationId); audioCtx.close(); el.start.disabled = false; el.stop.disabled = true; };
-
+    // ... (中略: 初期設定やstart/stopボタンの処理は前回のものを使用)
+    
+    // update関数内の修正
     function update(timestamp) {
         animationId = requestAnimationFrame(update);
         if (timestamp - lastUpdate < 50) return;
@@ -125,42 +120,24 @@
         ctx.clearRect(0, 0, cw, ch);
 
         let maxVal = 0, maxIndex = 0;
-        ctx.beginPath();
-        ctx.strokeStyle = '#007aff';
-        ctx.lineWidth = 1.5;
-        for (let i = 0; i < dataArray.length; i++) {
-            if (dataArray[i] > maxVal) { maxVal = dataArray[i]; maxIndex = i; }
-            const x = (i / dataArray.length) * cw;
-            const y = ch - (Math.min(dataArray[i], CONFIG.SENSITIVITY) / CONFIG.SENSITIVITY) * ch;
-            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-
+        // ... (波形描画処理は同じ)
+        
         const hz = Math.round(maxIndex * audioCtx.sampleRate / analyser.fftSize);
         if (hz > 50) {
-            const motorRpm = hz * 60;
-            const gearRatio = parseFloat(el.gear.value);
-            const tireRpm = motorRpm / gearRatio;
-            const spd = (parseFloat(el.tire.value) * Math.PI * tireRpm * 60) / 1000000;
-            
-            if (motorRpm > stats.maxRpm) stats.maxRpm = motorRpm;
-            if (motorRpm < stats.minRpm || stats.minRpm === 999999) stats.minRpm = motorRpm;
-            if (spd > stats.maxSpd) stats.maxSpd = spd;
-            if (spd < stats.minSpd || stats.minSpd === 999999) stats.minSpd = spd;
+            lastRpm = hz * 60;
+            if (lastRpm > stats.maxRpm) stats.maxRpm = lastRpm;
+            if (lastRpm < stats.minRpm || stats.minRpm === 999999) stats.minRpm = lastRpm;
 
-            el.rpmCur.textContent = motorRpm.toLocaleString();
+            el.rpmCur.textContent = lastRpm.toLocaleString();
             el.rpmMax.textContent = stats.maxRpm.toLocaleString();
             el.rpmMin.textContent = stats.minRpm.toLocaleString();
-            el.spdCur.textContent = spd.toFixed(1);
-            el.spdMax.textContent = stats.maxSpd.toFixed(1);
-            el.spdMin.textContent = stats.minSpd.toFixed(1);
-
-            const pos = (motorRpm / CONFIG.MAX_RPM) * cw;
-            ctx.strokeStyle = '#ff3b30';
-            ctx.lineWidth = 2.0;
-            ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, ch); ctx.stroke();
+            
+            updateSpeedDisplay(lastRpm);
+            
+            // ... (オーバーレイ描画)
         }
     }
 </script>
+
 </body>
 </html>
