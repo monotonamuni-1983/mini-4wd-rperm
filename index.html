@@ -12,12 +12,13 @@
         .box { background: var(--card); padding: 15px; border-radius: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); text-align: center; }
         .label { font-size: 0.7rem; color: #8e8e93; margin-bottom: 5px; }
         .value { font-size: 1.2rem; font-weight: 800; }
-        .slider-box { background: var(--card); padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .slider-box, .select-box { background: var(--card); padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .controls { display: flex; gap: 12px; margin-bottom: 20px; }
         button { flex: 1; padding: 18px; border-radius: 14px; border: none; font-weight: 700; font-size: 1rem; cursor: pointer; }
         #startBtn { background: var(--accent); color: white; }
         #stopBtn { background: #ff3b30; color: white; }
         #resetBtn { background: #e5e5ea; }
+        select { width: 100%; padding: 10px; border-radius: 10px; font-size: 1rem; border: 1px solid #ddd; }
         #canvas { width: 100%; height: 180px; background: #000; border-radius: 16px; display: block; touch-action: none; }
         .axis-labels { display: flex; justify-content: space-between; font-size: 0.7rem; color: #8e8e93; padding: 10px 5px; }
     </style>
@@ -29,6 +30,21 @@
         <div class="label">タイヤ外径: <span id="tireVal">26.0</span>mm</div>
         <input type="range" id="tireSlider" min="22.0" max="35.0" step="0.1" value="26.0" style="width: 100%; height: 30px;">
     </div>
+    
+    <div class="select-box">
+        <div class="label">ギア比選択</div>
+        <select id="gearSelect">
+            <option value="3.5">3.5:1</option>
+            <option value="3.7">3.7:1</option>
+            <option value="4.0">4.0:1</option>
+            <option value="4.2">4.2:1</option>
+            <option value="5.0">5.0:1</option>
+            <option value="6.4">6.4:1</option>
+            <option value="8.75">8.75:1</option>
+            <option value="11.2">11.2:1</option>
+        </select>
+    </div>
+
     <div class="controls">
         <button id="startBtn">開始</button>
         <button id="stopBtn" disabled>停止</button>
@@ -60,6 +76,7 @@
         rpmCur: document.getElementById('rpmCur'), rpmMax: document.getElementById('rpmMax'), rpmMin: document.getElementById('rpmMin'),
         spdCur: document.getElementById('spdCur'), spdMax: document.getElementById('spdMax'), spdMin: document.getElementById('spdMin'),
         tire: document.getElementById('tireSlider'), tireVal: document.getElementById('tireVal'),
+        gear: document.getElementById('gearSelect'),
         start: document.getElementById('startBtn'), stop: document.getElementById('stopBtn'), reset: document.getElementById('resetBtn')
     };
 
@@ -82,10 +99,8 @@
     };
 
     el.start.onclick = async () => {
-        // iPhone向け：AudioContextの作成と再開
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        await audioCtx.resume(); 
-        
+        await audioCtx.resume();
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             const source = audioCtx.createMediaStreamSource(stream);
@@ -95,9 +110,7 @@
             dataArray = new Uint8Array(analyser.frequencyBinCount);
             el.start.disabled = true; el.stop.disabled = false;
             update();
-        } catch (err) {
-            alert("マイクへのアクセスが拒否されました。設定を確認してください。");
-        }
+        } catch (err) { alert("マイクへのアクセスが拒否されました。"); }
     };
 
     el.stop.onclick = () => { cancelAnimationFrame(animationId); audioCtx.close(); el.start.disabled = false; el.stop.disabled = true; };
@@ -125,32 +138,27 @@
 
         const hz = Math.round(maxIndex * audioCtx.sampleRate / analyser.fftSize);
         if (hz > 50) {
-            const rpm = hz * 60;
-            const spd = ((el.tire.value * Math.PI * rpm * 60) / 1000000);
+            const motorRpm = hz * 60;
+            const gearRatio = parseFloat(el.gear.value);
+            const tireRpm = motorRpm / gearRatio;
+            const spd = (parseFloat(el.tire.value) * Math.PI * tireRpm * 60) / 1000000;
             
-            if (rpm > stats.maxRpm) stats.maxRpm = rpm;
-            if (rpm < stats.minRpm || stats.minRpm === 999999) stats.minRpm = rpm;
+            if (motorRpm > stats.maxRpm) stats.maxRpm = motorRpm;
+            if (motorRpm < stats.minRpm || stats.minRpm === 999999) stats.minRpm = motorRpm;
             if (spd > stats.maxSpd) stats.maxSpd = spd;
             if (spd < stats.minSpd || stats.minSpd === 999999) stats.minSpd = spd;
 
-            el.rpmCur.textContent = rpm.toLocaleString();
+            el.rpmCur.textContent = motorRpm.toLocaleString();
             el.rpmMax.textContent = stats.maxRpm.toLocaleString();
             el.rpmMin.textContent = stats.minRpm.toLocaleString();
             el.spdCur.textContent = spd.toFixed(1);
             el.spdMax.textContent = stats.maxSpd.toFixed(1);
             el.spdMin.textContent = stats.minSpd.toFixed(1);
 
-            const pos = (rpm / CONFIG.MAX_RPM) * cw;
+            const pos = (motorRpm / CONFIG.MAX_RPM) * cw;
             ctx.strokeStyle = '#ff3b30';
             ctx.lineWidth = 2.0;
             ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, ch); ctx.stroke();
-
-            const text = `${rpm.toLocaleString()} RPM`;
-            ctx.font = 'bold 14px sans-serif';
-            ctx.fillStyle = 'rgba(0,0,0,0.6)';
-            ctx.fillRect(pos + 5, 5, 80, 20);
-            ctx.fillStyle = '#ff3b30';
-            ctx.fillText(text, pos + 8, 20);
         }
     }
 </script>
