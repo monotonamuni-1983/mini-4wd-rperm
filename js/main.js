@@ -341,6 +341,12 @@ function resetMeasurement() {
 
 /* 保存 */
 function saveCurrentHistory(name, motorType) {
+
+  if (isNaN(currentSpeed) || currentSpeed === 0) {
+    alert("計測が完了していません");
+    return;
+  }
+
   const voltage = parseFloat(document.getElementById("voltageRange").value).toFixed(1);
   const gearIndex = parseInt(document.getElementById("gearRange").value, 10);
   const gearStr = gearOptions[gearIndex];
@@ -364,6 +370,7 @@ function saveCurrentHistory(name, motorType) {
   renderHistory();
   buildFilterOptions();
 }
+
 
 /* 履歴フィルター */
 function buildFilterOptions() {
