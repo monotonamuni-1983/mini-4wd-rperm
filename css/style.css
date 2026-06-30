@@ -242,6 +242,7 @@ input[type="range"]::-webkit-slider-thumb {
   border-bottom: 1px solid #e3e7f5;
   font-size: 0.9rem;
 }
+
 /* 保存モーダル */
 .text-input {
   width: 100%;

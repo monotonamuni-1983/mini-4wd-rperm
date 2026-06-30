@@ -84,6 +84,7 @@ PRESET.rpmCal.addEventListener("input", () => {
   updatePresetLabels();
   savePresets();
 });
+
 PRESET.load.addEventListener("input", () => {
   updatePresetLabels();
   savePresets();
