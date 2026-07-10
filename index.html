@@ -672,23 +672,21 @@
   });
 
   /* 計測開始 / 停止 */
-  UI.startBtn.addEventListener("click", () => {
-    measuring = !measuring;
 
-    if (measuring) {
-      UI.startBtn.textContent = "計測停止";
-      UI.statusLine.textContent = "MEASURING — 計測中";
+/* 計測開始 / 停止 */
+UI.startBtn.addEventListener("click", () => {
+  measuring = !measuring;
 
-      lockedSnapshot = null;          // 仮ロック削除
-      comparisonBody.innerHTML = "";  // 比較表クリア
-
-      startMic();
-    } else {
-      UI.startBtn.textContent = "計測開始";
-      UI.statusLine.textContent = "READY — 計測待機中";
-      stopMic();
-    }
-  });
+  if (measuring) {
+    UI.startBtn.textContent = "計測停止";
+    UI.statusLine.textContent = "MEASURING — 計測中";
+    startMic();
+  } else {
+    UI.startBtn.textContent = "計測開始";
+    UI.statusLine.textContent = "READY — 計測待機中";
+    stopMic();
+  }
+});
 
   /* ロック（計測値を固定して比較表を計算） */
   UI.lockBtn.addEventListener("click", () => {
@@ -955,7 +953,7 @@
   function stopMic() {
     running = false;
 
-    if (audioContext) audioContext.suspend();
+    // audioContext.suspend(); ← 削除
     if (micStream) {
       micStream.getTracks().forEach(t => t.stop());
       micStream = null;
