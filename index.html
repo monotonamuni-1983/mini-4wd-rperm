@@ -909,6 +909,14 @@
   const waveCanvas = document.getElementById("waveCanvas");
   const ctx = waveCanvas.getContext("2d");
 
+const waveCanvas = document.getElementById("waveCanvas");
+const ctx = waveCanvas.getContext("2d");
+
+/* ここに追加 */
+const comparisonBody = document.getElementById("comparisonBody");
+const historyBody = document.getElementById("historyBody");
+
+
   function resizeCanvas() {
     waveCanvas.width = waveCanvas.clientWidth;
     waveCanvas.height = waveCanvas.clientHeight;
