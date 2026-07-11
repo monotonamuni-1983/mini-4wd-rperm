@@ -385,6 +385,29 @@
       margin-top: 12px;
     }
 
+/* 比較表を少しだけ元に寄せる */
+
+#comparisonBody td {
+  padding: 4px 6px;          /* 行間を少し詰める（元に近づく） */
+  font-size: 13px;           /* 元の小さめフォントに寄せる */
+  border-bottom: 1px solid #ddd; /* 元の細い罫線に寄せる */
+}
+
+/* 電圧行のハイライト（元の淡い色に寄せる） */
+.highlight-row {
+  background-color: #eef6ff; /* 元の淡い青系に寄せる */
+}
+
+/* ギヤ比列のハイライト（強すぎない色に調整） */
+.highlight-col {
+  background-color: #f7faff; /* ほんのり青で控えめに */
+}
+
+/* 列幅を少し詰める（元のコンパクト感に寄せる） */
+.comparison-table td {
+  min-width: 70px;
+}
+
   </style>
 </head>
 <body>
