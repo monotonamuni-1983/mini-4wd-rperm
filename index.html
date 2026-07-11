@@ -341,6 +341,58 @@ UI.startBtn.addEventListener("click", async () => {
     console.error(e);
   }
 });
+/* ===== 計測開始 ===== */
+UI.startBtn.addEventListener("click", async () => {
+  try {
+    UI.statusLine.textContent = "MIC — 許可待ち";
+    await startMic();
+    UI.statusLine.textContent = "MIC — 計測中";
+  } catch (e) {
+    UI.statusLine.textContent = "MIC — 許可が必要です";
+  }
+});
+
+/* ===== ロック ===== */
+UI.lockBtn.addEventListener("click", () => {
+  locked = !locked;
+  if (locked) {
+    lockCurrent();
+    UI.statusLine.textContent = "LOCKED — 比較表生成中";
+  } else {
+    unlockCurrent();
+    UI.statusLine.textContent = "UNLOCKED — リアルタイム計測";
+  }
+});
+
+/* ===== 保存モーダルを開く ===== */
+UI.saveBtn.addEventListener("click", () => {
+  UI.saveModal.classList.remove("hidden");
+});
+
+/* ===== 保存実行 ===== */
+UI.saveConfirmBtn.addEventListener("click", () => {
+  const name = UI.saveNameInput.value.trim();
+  const motor = UI.motorTypeSelect.value;
+
+  if (!name) {
+    alert("名前を入力してください");
+    return;
+  }
+
+  saveCurrentHistory(name, motor);
+  UI.saveModal.classList.add("hidden");
+});
+
+/* ===== 保存キャンセル ===== */
+UI.saveCancelBtn.addEventListener("click", () => {
+  UI.saveModal.classList.add("hidden");
+});
+
+/* ===== リセット ===== */
+UI.resetBtn.addEventListener("click", () => {
+  resetMeasurement();
+  UI.statusLine.textContent = "RESET — 計測待機中";
+});
 
   </script>
 
