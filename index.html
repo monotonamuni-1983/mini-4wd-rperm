@@ -588,6 +588,34 @@
 
   <!-- ===== 設定モーダル ===== -->
   <div id="settingsModalBackdrop" class="modal-backdrop hidden">
+
+/* モーダル背景を中央寄せコンテナにする */
+#settingsModalBackdrop {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 40px;
+}
+
+/* モーダル本体（class="modal"）を中央に固定 */
+#settingsModalBackdrop .modal {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+
+  width: 90%;
+  max-width: 480px;   /* スマホでもPCでも中央に収まる */
+  margin: 0 auto;     /* 中央寄せの決定打 */
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+
+/* スマホで左右が切れないようにする */
+@media (max-width: 600px) {
+  #settingsModalBackdrop .modal {
+    width: calc(100% - 32px); /* 左右16pxずつ余白 */
+  }
+}
+
     <div class="modal">
 
       <button id="helpButton" class="help-btn">？</button>
