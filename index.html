@@ -385,29 +385,6 @@
       margin-top: 12px;
     }
 
-/* 比較表を少しだけ元に寄せる */
-
-#comparisonBody td {
-  padding: 4px 6px;          /* 行間を少し詰める（元に近づく） */
-  font-size: 13px;           /* 元の小さめフォントに寄せる */
-  border-bottom: 1px solid #ddd; /* 元の細い罫線に寄せる */
-}
-
-/* 電圧行のハイライト（元の淡い色に寄せる） */
-.highlight-row {
-  background-color: #eef6ff; /* 元の淡い青系に寄せる */
-}
-
-/* ギヤ比列のハイライト（強すぎない色に調整） */
-.highlight-col {
-  background-color: #f7faff; /* ほんのり青で控えめに */
-}
-
-/* 列幅を少し詰める（元のコンパクト感に寄せる） */
-.comparison-table td {
-  min-width: 70px;
-}
-
   </style>
 </head>
 <body>
@@ -610,12 +587,11 @@
         走行負荷：実走行時の負荷を想定して速度を補正します。
       </div>
 
-     <div class="setting-item">
-  <div class="setting-label">ノイズ閾値</div>
-  <input id="noiseRange" type="range" min="-120" max="-40" step="1" value="-80" />
-  <div id="noiseLabel">-80 dB</div>
-</div>
-
+      <div class="setting-item">
+        <div class="setting-label">ノイズ閾値</div>
+        <input id="noiseRange" type="range" min="0" max="100" step="1" value="20" />
+        <div id="noiseLabel">20 dB</div>
+      </div>
 
       <div class="setting-item">
         <div class="setting-label">RPM補正係数</div>
@@ -636,8 +612,6 @@
       <button id="closeSettings" class="close-btn">閉じる</button>
     </div>
   </div>
-
-
 <!-- ============================= -->
 <!-- JS1 : UIイベント（モーダル・ボタン・ロック制御・検索ボタン） -->
 <!-- ============================= -->
@@ -708,14 +682,11 @@
       lockedSnapshot = null;          // 仮ロック削除
       comparisonBody.innerHTML = "";  // 比較表クリア
 
-      // ★唯一の差し替えポイント（壊さない）
-      startAudio();
+      startMic();
     } else {
       UI.startBtn.textContent = "計測開始";
       UI.statusLine.textContent = "READY — 計測待機中";
-
-      // ★唯一の差し替えポイント（壊さない）
-      stopAudio();
+      stopMic();
     }
   });
 
@@ -800,11 +771,6 @@
     lastTouchEnd = now;
   }, { passive: false });
 </script>
-
-
-
-
-
 <!-- ============================= -->
 <!-- JS2 : プリセット管理（電圧・ギヤ比・タイヤ径・補正） -->
 <!-- ============================= -->
@@ -825,8 +791,6 @@
     noiseLabel: document.getElementById("noiseLabel"),
     rpmCalLabel: document.getElementById("rpmCalLabel"),
     loadLabel: document.getElementById("loadFactorLabel"),
-
-poleCount: 2   // ★ミニ四駆は 2極
   };
 
   /* ギヤ比（拡張版） */
@@ -923,10 +887,8 @@ poleCount: 2   // ★ミニ四駆は 2極
   /* 初期ロード */
   loadPresets();
 </script>
-
-
 <!-- ============================= -->
-<!-- JS3 : FFT / 比較表 / 履歴管理（範囲制限統合完全版） -->
+<!-- JS3 : FFT / 比較表 / 履歴管理 -->
 <!-- ============================= -->
 <script>
   /* ============================================================
@@ -966,47 +928,67 @@ poleCount: 2   // ★ミニ四駆は 2極
 
   let lockedSnapshot = null;
 
-  const historyList = document.getElementById("historyList");
-  const comparisonBody = document.getElementById("comparisonBody");
-
   /* ============================================================
-     Start / Stop Microphone（許可が消えない版）
+     Start Microphone
   ============================================================ */
   async function startMic() {
     if (running) return;
+
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = FFT_SIZE;
+
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+    const source = audioContext.createMediaStreamSource(micStream);
+    source.connect(analyser);
+
     running = true;
-
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    }
-
-    if (!micStream) {
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    }
-
-    if (!analyser) {
-      analyser = audioContext.createAnalyser();
-      analyser.fftSize = FFT_SIZE;
-
-      dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-      const source = audioContext.createMediaStreamSource(micStream);
-      source.connect(analyser);
-    }
-
-    if (audioContext.state === "suspended") {
-      await audioContext.resume();
-    }
-
     loopFFT();
   }
 
+  /* ============================================================
+     Stop Microphone
+  ============================================================ */
   function stopMic() {
     running = false;
 
-    if (audioContext && audioContext.state === "running") {
-      audioContext.suspend();
+    if (audioContext) audioContext.suspend();
+    if (micStream) {
+      micStream.getTracks().forEach(t => t.stop());
+      micStream = null;
     }
+  }
+
+  /* ============================================================
+     Precise Peak Detection
+  ============================================================ */
+  function getPrecisePeakHz(data, fftSize, sampleRate) {
+    const binToHz = sampleRate / fftSize;
+
+    let maxVal = -Infinity;
+    let maxIdx = -1;
+
+    for (let i = 1; i < data.length - 1; i++) {
+      const v = data[i];
+      if (v > maxVal) {
+        maxVal = v;
+        maxIdx = i;
+      }
+    }
+    if (maxIdx <= 0 || maxIdx >= data.length - 1) return 0;
+
+    const y1 = data[maxIdx - 1];
+    const y2 = data[maxIdx];
+    const y3 = data[maxIdx + 1];
+
+    const denom = (y1 - 2 * y2 + y3);
+    const offset = denom === 0 ? 0 : (y1 - y3) / (2 * denom);
+
+    const peakBin = maxIdx + offset;
+    return peakBin * binToHz;
   }
 
   /* ============================================================
@@ -1032,7 +1014,7 @@ poleCount: 2   // ★ミニ四駆は 2極
   }
 
   /* ============================================================
-     FFT Loop（RPM 5000〜60000 範囲 & ピーク検出範囲制限）
+     FFT Loop（横軸RPM）
   ============================================================ */
   function loopFFT() {
     if (!running) return;
@@ -1051,7 +1033,6 @@ poleCount: 2   // ★ミニ四駆は 2極
     const sampleRate = audioContext.sampleRate;
     const binToHz = sampleRate / FFT_SIZE;
 
-    // 描画は 5000〜60000RPM の範囲だけ
     for (let x = 0; x < w; x++) {
       const bin = Math.floor((x / w) * dataArray.length);
       const hz = bin * binToHz;
@@ -1069,56 +1050,30 @@ poleCount: 2   // ★ミニ四駆は 2極
 
     if (locked) return;
 
-    // ★ ピーク検出範囲制限（5000〜60000RPM）
-    const minHz = 5000 / 60;
-    const maxHz = 60000 / 60;
-    const minBin = Math.floor(minHz / binToHz);
-    const maxBin = Math.floor(maxHz / binToHz);
+    const peakHz = getPrecisePeakHz(dataArray, analyser.fftSize, audioContext.sampleRate);
+    if (peakHz > 0) {
+      const rawRpm = peakHz * 60;
+      const { adjustedRpm, speed } = computeSpeedFromRpm(rawRpm);
 
-    let maxVal = -Infinity;
-    let maxIdx = -1;
-    for (let i = minBin; i <= maxBin; i++) {
-      const v = dataArray[i];
-      if (v > maxVal) {
-        maxVal = v;
-        maxIdx = i;
-      }
+      currentRpm = adjustedRpm;
+      currentSpeed = speed;
+
+      if (maxRpmVal === 0 || adjustedRpm > maxRpmVal) maxRpmVal = adjustedRpm;
+      if (minRpmVal === 0 || adjustedRpm < minRpmVal) minRpmVal = adjustedRpm;
+
+      if (maxSpeedVal === 0 || speed > maxSpeedVal) maxSpeedVal = speed;
+      if (minSpeedVal === 0 || speed < minSpeedVal) minSpeedVal = speed;
+
+      rpmNow.textContent = Math.round(adjustedRpm);
+      rpmMax.textContent = Math.round(maxRpmVal);
+      rpmMin.textContent = Math.round(minRpmVal);
+
+      speedNow.textContent = speed.toFixed(2) + " km/h";
+      speedTop.textContent = maxSpeedVal.toFixed(2) + " km/h";
+      speedMin.textContent = minSpeedVal.toFixed(2) + " km/h";
+
+      generateComparisonTableFromLock();
     }
-    if (maxIdx < 0) return;
-
-    const y1 = dataArray[maxIdx - 1];
-    const y2 = dataArray[maxIdx];
-    const y3 = dataArray[maxIdx + 1];
-    const denom = (y1 - 2 * y2 + y3);
-    const offset = denom === 0 ? 0 : (y1 - y3) / (2 * denom);
-    const peakBin = maxIdx + offset;
-    const peakHz = peakBin * binToHz;
-
-    const rawRpm = peakHz * 60;
-
-    // 念のため RPM も範囲チェック
-    if (rawRpm < 5000 || rawRpm > 60000) return;
-
-    const { adjustedRpm, speed } = computeSpeedFromRpm(rawRpm);
-
-    currentRpm = adjustedRpm;
-    currentSpeed = speed;
-
-    if (maxRpmVal === 0 || adjustedRpm > maxRpmVal) maxRpmVal = adjustedRpm;
-    if (minRpmVal === 0 || adjustedRpm < minRpmVal) minRpmVal = adjustedRpm;
-
-    if (maxSpeedVal === 0 || speed > maxSpeedVal) maxSpeedVal = speed;
-    if (minSpeedVal === 0 || speed < minSpeedVal) minSpeedVal = speed;
-
-    rpmNow.textContent = Math.round(adjustedRpm);
-    rpmMax.textContent = Math.round(maxRpmVal);
-    rpmMin.textContent = Math.round(minRpmVal);
-
-    speedNow.textContent = speed.toFixed(2) + " km/h";
-    speedTop.textContent = maxSpeedVal.toFixed(2) + " km/h";
-    speedMin.textContent = minSpeedVal.toFixed(2) + " km/h";
-
-    generateComparisonTableFromLock();
   }
 
   /* ============================================================
@@ -1126,27 +1081,40 @@ poleCount: 2   // ★ミニ四駆は 2極
   ============================================================ */
   function lockCurrent() {
     lockedSnapshot = {
-      rpm: currentRpm,
-      speed: currentSpeed
+      rpm: currentRpm,     // ★補正後RPMを保存
+      speed: currentSpeed  // ★補正後速度を保存
     };
 
-    generateComparisonTableFromLock();
-  }
+    generateComparisonTableFromLock(); // ロック直後に比較表function unlockCurrent() {
+  // ロック解除
+  locked = false;
+  lockedSnapshot = null;
 
-  function unlockCurrent() {
-    lockedSnapshot = null;
-    comparisonBody.innerHTML = "";
-  }
+  // 比較表クリア
+  comparisonBody.innerHTML = "";
+
+  // ハイライト解除（電圧行・ギヤ比列）
+  document.querySelectorAll(".highlight-row").forEach(r => r.classList.remove("highlight-row"));
+  document.querySelectorAll(".highlight-col").forEach(c => c.classList.remove("highlight-col"));
+
+  // UI表示を元に戻す
+  UI.lockBtn.textContent = "ロック";
+  UI.statusLine.textContent = "MEASURING — 計測中";
+
+  // FFTループは running=true のままなら自動で再開する
+}
+
 
   /* ============================================================
      Comparison Table (Lock基準)
+     ★電圧計算修正済み
   ============================================================ */
   function generateComparisonTableFromLock() {
     if (!lockedSnapshot) return;
 
     const baseRpm = lockedSnapshot.rpm;
     const tire = parseFloat(document.getElementById("tireRange").value);
-    const currentVoltage = parseFloat(document.getElementById("voltageRange").value);
+    const currentVoltage = parseFloat(document.getElementById("voltageRange").value); // ★修正：toFixed禁止
 
     comparisonBody.innerHTML = "";
 
@@ -1160,6 +1128,7 @@ poleCount: 2   // ★ミニ四駆は 2極
       tdV.textContent = voltage.toFixed(1);
       tr.appendChild(tdV);
 
+      // ★正しい電圧比計算
       const rpm = Math.round(baseRpm * (voltage / currentVoltage));
 
       const tdR = document.createElement("td");
@@ -1248,13 +1217,16 @@ poleCount: 2   // ★ミニ四駆は 2極
   }
 
   /* ============================================================
-     History Filter / Render
+     History Filter
   ============================================================ */
   const filterVoltage = document.getElementById("filterVoltage");
   const filterGear = document.getElementById("filterGear");
   const filterTire = document.getElementById("filterTire");
   const filterMotor = document.getElementById("filterMotor");
   const filterName = document.getElementById("filterName");
+
+  const historyList = document.getElementById("historyList");
+  const comparisonBody = document.getElementById("comparisonBody");
 
   function buildFilterOptions() {
     const list = JSON.parse(localStorage.getItem("rpmHistory") || "[]");
@@ -1304,6 +1276,9 @@ poleCount: 2   // ★ミニ四駆は 2極
     });
   }
 
+  /* ============================================================
+     History Render
+  ============================================================ */
   function renderHistory() {
     const list = JSON.parse(localStorage.getItem("rpmHistory") || "[]");
     const filtered = applyHistoryFilter(list);
