@@ -1138,7 +1138,6 @@ function lockCurrent() {
 
 function unlockCurrent() {
   lockedSnapshot = null;
-  locked = false;
   comparisonBody.innerHTML = "";
 }
 
@@ -1148,14 +1147,12 @@ function unlockCurrent() {
 function generateComparisonTableFromLock() {
   if (!lockedSnapshot) return;
 
-  // ベースRPMはロック値を使う
   const baseRpm = lockedSnapshot.rpm;
 
-  // 電圧・ギヤ比・タイヤ径・負荷は「現在のスライダー値」を参照
   const currentVoltage = parseFloat(document.getElementById("voltageRange").value);
   const currentGear = gearOptions[parseInt(document.getElementById("gearRange").value)];
   const tire = parseFloat(document.getElementById("tireRange").value);
-  const loadFactor = parseFloat(document.getElementById("loadRange").value) / 100;
+  const loadFactor = parseFloat(document.getElementById("loadFactorRange").value) / 100; // ★修正
 
   comparisonBody.innerHTML = "";
 
@@ -1166,17 +1163,14 @@ function generateComparisonTableFromLock() {
     const tr = document.createElement("tr");
     if (voltage === currentVoltage) tr.classList.add("highlight-row");
 
-    // 電圧
     const tdV = document.createElement("td");
     tdV.textContent = voltage.toFixed(1);
     tr.appendChild(tdV);
 
-    // RPM
     const tdR = document.createElement("td");
     tdR.textContent = rpm;
     tr.appendChild(tdR);
 
-    // ギヤ比ごとの速度（全ギヤ比）
     gearOptions.forEach(g => {
       const gearRatio = parseFloat(g.split(":")[0]);
       const wheelRpm = rpm / gearRatio;
