@@ -159,11 +159,16 @@
     /* ============================================================
        Buttons
     ============================================================ */
-    .realtime-buttons {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
+    .realtime-buttons-2row {
       margin-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .btn-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
     }
     .primary-btn, .secondary-btn {
       padding: 14px 0;
@@ -307,7 +312,6 @@
       box-sizing: border-box;
     }
 
-    /* 履歴検索ボタン */
     #historySearchBtn {
       width: 100%;
       height: 48px;
@@ -321,7 +325,6 @@
       margin-top: 4px;
     }
 
-    /* History List */
     .history-scroll {
       overflow-x: auto;
     }
@@ -361,7 +364,6 @@
       box-sizing: border-box;
     }
 
-    /* Save Modal */
     .text-input {
       width: 100%;
       padding: 10px;
@@ -390,7 +392,6 @@
       margin-top: 12px;
     }
 
-    /* Close Buttons */
     .close-btn {
       width: 100%;
       padding: 16px 0;
@@ -403,7 +404,6 @@
       margin-top: 12px;
     }
 
-    /* 設定モーダル幅を履歴と同じに */
     #settingsModalBackdrop .modal {
       max-width: 480px;
       width: 90%;
@@ -505,15 +505,22 @@
 
       <div class="status-line" id="statusLine">READY — 計測待機中</div>
 
-      <div class="realtime-buttons">
-        <button id="startBtn" class="primary-btn">計測開始</button>
-        <button id="lockBtn" class="secondary-btn">ロック</button>
-        <button id="saveBtn" class="secondary-btn">保存</button>
-        <button id="resetBtn" class="secondary-btn">リセット</button>
+      <!-- 計測ボタン上下3つずつ -->
+      <div class="realtime-buttons-2row">
+        <div class="btn-row">
+          <button id="startBtn" class="primary-btn">計測開始</button>
+          <button id="lockBtn" class="secondary-btn">ロック</button>
+          <button id="saveBtn" class="secondary-btn">保存</button>
+        </div>
+        <div class="btn-row">
+          <button id="historyBtn2" class="secondary-btn">履歴</button>
+          <button id="settingsBtn2" class="secondary-btn">設定</button>
+          <button id="resetBtn" class="secondary-btn">リセット</button>
+        </div>
       </div>
     </section>
 
-    <!-- 計測条件カード（電圧・ギヤ比・タイヤ径） -->
+    <!-- 計測条件カード -->
     <section class="card">
       <div class="card-title">計測条件</div>
 
@@ -724,6 +731,9 @@
       historySearchBtn: document.getElementById("historySearchBtn"),
 
       settingsResetBtn: document.getElementById("settingsResetBtn"),
+
+      historyBtn2: document.getElementById("historyBtn2"),
+      settingsBtn2: document.getElementById("settingsBtn2"),
     };
 
     let measuring = false;
@@ -734,6 +744,9 @@
 
     UI.settingsBtn.addEventListener("click", () => UI.settingsModal.classList.remove("hidden"));
     UI.closeSettings.addEventListener("click", () => UI.settingsModal.classList.add("hidden"));
+
+    UI.historyBtn2.addEventListener("click", () => UI.historyModal.classList.remove("hidden"));
+    UI.settingsBtn2.addEventListener("click", () => UI.settingsModal.classList.remove("hidden"));
 
     UI.helpButton.addEventListener("click", () => UI.helpText.classList.toggle("hidden"));
 
@@ -972,11 +985,11 @@
 
     function applyHistoryFilter(list) {
       return list.filter(item => {
-        if (filterVoltage.value && item.voltage !== filterVoltage.value) return false;
-        if (filterGear.value && item.gear !== filterGear.value) return false;
-        if (filterTire.value && item.tire !== filterTire.value) return false;
-        if (filterMotor.value && item.motor !== filterMotor.value) return false;
-        if (filterName.value && item.name !== filterName.value) return false;
+        if (filterVoltage.value !== "" && item.voltage !== filterVoltage.value) return false;
+        if (filterGear.value !== "" && item.gear !== filterGear.value) return false;
+        if (filterTire.value !== "" && item.tire !== filterTire.value) return false;
+        if (filterMotor.value !== "" && item.motor !== filterMotor.value) return false;
+        if (filterName.value !== "" && item.name !== filterName.value) return false;
         return true;
       });
     }
