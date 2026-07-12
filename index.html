@@ -961,36 +961,46 @@ let lockedSnapshot = null;
 /* ============================================================
    Start Microphone
 ============================================================ */
-async function startMic() {
+async function startAudio() {
   if (running) return;
+  running = true;
 
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
 
-  analyser = audioContext.createAnalyser();
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+  analyser = audioCtx.createAnalyser();
   analyser.fftSize = FFT_SIZE;
 
-  dataArray = new Uint8Array(analyser.frequencyBinCount);
+  const binCount = analyser.frequencyBinCount;
+  dataArray = new Uint8Array(binCount);
 
-  const source = audioContext.createMediaStreamSource(micStream);
+  const source = audioCtx.createMediaStreamSource(stream);
   source.connect(analyser);
 
-  running = true;
-  loopFFT();
+  lastRpm = null;
+  lastPeakBin = null;
+  autoRangeLocked = false;
+
+  loop();
 }
+
 
 /* ============================================================
    Stop Microphone
 ============================================================ */
-function stopMic() {
+function stopAudio() {
   running = false;
-
-  if (audioContext) audioContext.suspend();
-  if (micStream) {
-    micStream.getTracks().forEach(t => t.stop());
-    micStream = null;
+  if (audioCtx) audioCtx.suspend();
+  if (stream) {
+    stream.getTracks().forEach(t => t.stop());
+    stream = null;
   }
+  document.getElementById("rpmFinal").textContent = "-- RPM";
 }
+
 
 /* ============================================================
    Precise Peak Detection（dB変換＋ノイズ閾値）
@@ -1052,68 +1062,50 @@ function computeSpeedFromRpm(rpm) {
 /* ============================================================
    FFT Loop
 ============================================================ */
-function loopFFT() {
+function loop() {
   if (!running) return;
-  requestAnimationFrame(loopFFT);
+  requestAnimationFrame(loop);
 
   analyser.getByteFrequencyData(dataArray);
 
-  const w = waveCanvas.width;
-  const h = waveCanvas.height;
+  const w = canvas.width;
+  const h = canvas.height;
 
   ctx.clearRect(0, 0, w, h);
   ctx.beginPath();
-  ctx.strokeStyle = "#ff4fa3";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#00ff9d";
+  ctx.lineWidth = 1.2;
 
-  const sampleRate = audioContext.sampleRate;
-  const binToHz = sampleRate / FFT_SIZE;
+  const step = dataArray.length / w;
+  const scale = h / 256;
 
-  // スペクトラム描画（RPMレンジフィルタは極数補正込み）
   for (let x = 0; x < w; x++) {
-    const bin = Math.floor((x / w) * dataArray.length);
-    const hz = bin * binToHz;
-    const rpm = (hz * 60) / PRESET.poleCount; // ★極数補正
-
-    if (rpm < 5000 || rpm > 60000) continue;
-
+    const bin = Math.floor(x * step);
     const v = dataArray[bin];
-    const y = h - (v / 255) * h;
-
+    const y = h - v * scale;
     if (x === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
   ctx.stroke();
 
-  if (locked) return;
-
-  const peakHz = getPrecisePeakHz(dataArray, analyser.fftSize, audioContext.sampleRate);
+  const peakHz = getPrecisePeakHz(dataArray, analyser.fftSize, audioCtx.sampleRate);
   if (peakHz > 0) {
-    // ★極数固定（ミニ四駆 2極）
-    const rawRpm = (peakHz * 60) / PRESET.poleCount;
+    const rawRpm = peakHz * 60;
+    const calibratedRpm = rawRpm * calFactor;
 
-    const { adjustedRpm, speed } = computeSpeedFromRpm(rawRpm);
+    const alpha = getSmoothAlpha(calibratedRpm);
+    let displayRpm = calibratedRpm;
+    if (lastRpm !== null) {
+      displayRpm = lastRpm * (1 - alpha) + calibratedRpm * alpha;
+    }
+    lastRpm = displayRpm;
 
-    currentRpm = adjustedRpm;
-    currentSpeed = speed;
+    autoAdjustRange(displayRpm);
 
-    if (maxRpmVal === 0 || adjustedRpm > maxRpmVal) maxRpmVal = adjustedRpm;
-    if (minRpmVal === 0 || adjustedRpm < minRpmVal) minRpmVal = adjustedRpm;
-
-    if (maxSpeedVal === 0 || speed > maxSpeedVal) maxSpeedVal = speed;
-    if (minSpeedVal === 0 || speed < minSpeedVal) minSpeedVal = speed;
-
-    rpmNow.textContent = Math.round(adjustedRpm);
-    rpmMax.textContent = Math.round(maxRpmVal);
-    rpmMin.textContent = Math.round(minRpmVal);
-
-    speedNow.textContent = speed.toFixed(2) + " km/h";
-    speedTop.textContent = maxSpeedVal.toFixed(2) + " km/h";
-    speedMin.textContent = minSpeedVal.toFixed(2) + " km/h";
-
-    generateComparisonTableFromLock();
+    document.getElementById("rpmFinal").textContent = Math.round(displayRpm);
   }
 }
+
 
 /* ============================================================
    Lock Snapshot（条件も保存）
