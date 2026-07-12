@@ -912,9 +912,6 @@
   loadPresets();
 </script>
 
-<!-- ============================= -->
-<!-- JS3 : FFT / 比較表 / 履歴管理（完全統合版） -->
-<!-- ============================= -->
 <script>
 /* ============================================================
    DOM refs
@@ -958,6 +955,7 @@ let maxSpeedVal = 0;
 let minSpeedVal = 0;
 
 let lockedSnapshot = null;
+let locked = false; // ロック状態フラグ
 
 /* ============================================================
    Start Microphone
@@ -999,7 +997,6 @@ function stopMic() {
 function getPrecisePeakHz(data, fftSize, sampleRate) {
   const binToHz = sampleRate / fftSize;
   const noiseThreshold = parseFloat(document.getElementById("noiseRange").value);
-
 
   let maxVal = -Infinity;
   let maxIdx = -1;
@@ -1071,10 +1068,11 @@ function loopFFT() {
   const sampleRate = audioContext.sampleRate;
   const binToHz = sampleRate / FFT_SIZE;
 
+  // スペクトラム描画（RPMレンジフィルタは極数補正込み）
   for (let x = 0; x < w; x++) {
     const bin = Math.floor((x / w) * dataArray.length);
     const hz = bin * binToHz;
-    const rpm = hz * 60;
+    const rpm = (hz * 60) / PRESET.poleCount; // ★極数補正
 
     if (rpm < 5000 || rpm > 60000) continue;
 
@@ -1090,9 +1088,8 @@ function loopFFT() {
 
   const peakHz = getPrecisePeakHz(dataArray, analyser.fftSize, audioContext.sampleRate);
   if (peakHz > 0) {
-
-    /* ★極数固定（2極） */
-    const rawRpm = peakHz * 60;
+    // ★極数固定（ミニ四駆 2極）
+    const rawRpm = (peakHz * 60) / PRESET.poleCount;
 
     const { adjustedRpm, speed } = computeSpeedFromRpm(rawRpm);
 
@@ -1135,26 +1132,30 @@ function lockCurrent() {
     maxSpeed: maxSpeedVal
   };
 
+  locked = true;
   generateComparisonTableFromLock();
 }
 
 function unlockCurrent() {
   lockedSnapshot = null;
+  locked = false;
   comparisonBody.innerHTML = "";
 }
 
 /* ============================================================
-   Comparison Table（ロック条件で生成）
+   Comparison Table（ロック条件＋スライダー連動）
 ============================================================ */
 function generateComparisonTableFromLock() {
   if (!lockedSnapshot) return;
 
+  // ベースRPMはロック値を使う
   const baseRpm = lockedSnapshot.rpm;
-  const currentVoltage = parseFloat(lockedSnapshot.voltage);
-  const currentGear = gearOptions[parseInt(lockedSnapshot.gearIndex)];
 
-  const tire = parseFloat(lockedSnapshot.tire);
-  const loadFactor = parseFloat(lockedSnapshot.load) / 100;
+  // 電圧・ギヤ比・タイヤ径・負荷は「現在のスライダー値」を参照
+  const currentVoltage = parseFloat(document.getElementById("voltageRange").value);
+  const currentGear = gearOptions[parseInt(document.getElementById("gearRange").value)];
+  const tire = parseFloat(document.getElementById("tireRange").value);
+  const loadFactor = parseFloat(document.getElementById("loadRange").value) / 100;
 
   comparisonBody.innerHTML = "";
 
@@ -1175,7 +1176,7 @@ function generateComparisonTableFromLock() {
     tdR.textContent = rpm;
     tr.appendChild(tdR);
 
-    // ギヤ比ごとの速度
+    // ギヤ比ごとの速度（全ギヤ比）
     gearOptions.forEach(g => {
       const gearRatio = parseFloat(g.split(":")[0]);
       const wheelRpm = rpm / gearRatio;
@@ -1195,7 +1196,6 @@ function generateComparisonTableFromLock() {
     comparisonBody.appendChild(tr);
   }
 }
-
 
 /* ============================================================
    Save History（ロック優先）
@@ -1256,6 +1256,7 @@ function resetMeasurement() {
   minSpeedVal = 0;
 
   lockedSnapshot = null;
+  locked = false;
   comparisonBody.innerHTML = "";
 }
 </script>
