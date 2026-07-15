@@ -728,16 +728,22 @@ function detectPeak2000Hz_StrongOnly() {
   }
   const avg = sum / maxIndex;
 
-  // ★ 振幅を「平均 × 2」以上にする（あなたの希望）
-  const threshold = avg * 2;
+  // ★ 振幅フィルタ（平均 × 4）←あなたの希望
+  const threshold = avg * 4;
 
   let bestIndex = -1;
   let bestValue = -Infinity;
 
-  for (let i = 0; i <= maxIndex; i++) {
+  for (let i = 1; i < maxIndex - 1; i++) {
     const v = fftBuffer[i];
 
-    if (v < threshold) continue;  // ★ 弱い音は無視（2倍フィルタ）
+    // ★ 弱い音は無視（平均×4）
+    if (v < threshold) continue;
+
+    // ★ 周囲との差が小さいならノイズ扱い（安定化）
+    const left = fftBuffer[i - 1];
+    const right = fftBuffer[i + 1];
+    if (v - Math.max(left, right) < 5) continue;
 
     if (v > bestValue) {
       bestValue = v;
@@ -749,6 +755,7 @@ function detectPeak2000Hz_StrongOnly() {
 
   return bestIndex * nyquist / fftBuffer.length;
 }
+
 
 
 
