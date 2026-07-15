@@ -716,23 +716,30 @@ function drawFFT() {
 }
 
 /* ---- ピーク検出 ---- */
-function detectPeak() {
+function detectPeak2000Hz_StrongOnly() {
   const nyquist = SAMPLE_RATE / 2;
 
-  const minRpm = parseInt(UI.rpmMinLimit.value, 10);
-  const maxRpm = parseInt(UI.rpmMaxLimit.value, 10);
-
-  const minHz = minRpm / 60;
-  const maxHz = maxRpm / 60;
-
-  const minIndex = Math.floor(minHz / nyquist * fftBuffer.length);
+  const maxHz = 2000;  // ★★★ 2000Hz 上限固定 ★★★
   const maxIndex = Math.floor(maxHz / nyquist * fftBuffer.length);
+
+  // ★平均振幅（dB）を計算
+  let sum = 0;
+  for (let i = 0; i <= maxIndex; i++) {
+    sum += fftBuffer[i];
+  }
+  const avg = sum / maxIndex;
+
+  // ★1.5倍以上の強度だけ採用
+  const threshold = avg * 1.5;
 
   let bestIndex = -1;
   let bestValue = -Infinity;
 
-  for (let i = minIndex; i <= maxIndex; i++) {
+  for (let i = 0; i <= maxIndex; i++) {
     const v = fftBuffer[i];
+
+    if (v < threshold) continue;  // ★弱い音は無視
+
     if (v > bestValue) {
       bestValue = v;
       bestIndex = i;
@@ -741,9 +748,9 @@ function detectPeak() {
 
   if (bestIndex < 0) return null;
 
-  const peakHz = bestIndex * nyquist / fftBuffer.length;
-  return peakHz;
+  return bestIndex * nyquist / fftBuffer.length;
 }
+
 
 /* ---- RPM計算 ---- */
 function computeRpm(peakHz) {
@@ -1000,7 +1007,7 @@ function loop() {
   }
 
   drawFFT();                     // JS1
-  const peakHz = detectPeak();   // JS1
+  const peakHz = detectPeak2000Hz_StrongOnly();// JS1
   const rpm = computeRpm(peakHz); // JS1
   updateRealtimeUI(rpm);         // JS2
   buildComparisonTable();        // JS2
