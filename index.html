@@ -5,293 +5,48 @@
   <title>RPM Analyzer — Advanced FFT</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
   <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background: #ffffff;
-      font-family: "Noto Sans JP", -apple-system, BlinkMacSystemFont, sans-serif;
-      color: #333;
-      overflow-x: hidden;
-    }
-    .main-container {
-      padding: 12px 16px 16px 16px;
-      max-width: 480px;
-      margin: 0 auto;
-    }
-    .card {
-      background: #f5f7fc;
-      border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
-    .card-title {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 10px;
-    }
-    #waveCanvas {
-      width: 75%;
-      height: 160px;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: inset 0 0 6px rgba(0,0,0,0.08);
-      margin: 0 auto;
-      display: block;
-    }
-    .rpm-grid, .speed-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-top: 12px;
-      margin-left: 32px;
-    }
-    .rpm-grid div, .speed-grid div {
-      display: flex;
-      flex-direction: column;
-      font-size: 0.9rem;
-    }
-    .rpm-grid span:last-child,
-    .speed-grid span:last-child {
-      font-weight: 700;
-      margin-top: 2px;
-      text-align: right;
-      font-size: 1.2rem;
-    }
-    .rpm-limit-box {
-      margin: 12px 0 16px 0;
-      padding: 12px;
-      background: #ffffff;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-    .rpm-limit-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
-    .limit-slider {
-      flex: 1;
-      margin: 0 10px;
-      accent-color: #4fa3ff;
-    }
-    .limit-value {
-      width: 60px;
-      text-align: right;
-      font-size: 0.9rem;
-    }
-    .status-line {
-      margin-top: 12px;
-      font-size: 0.9rem;
-      color: #666;
-    }
-    .realtime-buttons-2row {
-      margin-top: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .btn-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-    }
-    .primary-btn, .secondary-btn {
-      padding: 14px 0;
-      border-radius: 999px;
-      font-size: 0.9rem;
-      font-weight: 700;
-      border: none;
-    }
-    .primary-btn {
-      background: #ff4fa3;
-      color: #fff;
-    }
-    .secondary-btn {
-      background: #e6ecff;
-      color: #4a6cff;
-    }
-    input[type="range"] {
-      width: 100%;
-      -webkit-appearance: none;
-      height: 6px;
-      border-radius: 999px;
-      background: #e3e7f5;
-      outline: none;
-      margin-top: 10px;
-    }
-    input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 42px;
-      height: 27px;
-      background: #ffffff;
-      border-radius: 999px;
-      border: 2px solid #4a6cff;
-    }
-    .comparison-wrapper {
-      overflow-x: auto;
-      padding-bottom: 12px;
-      margin-top: 10px;
-    }
-    .comparison-table {
-      border-collapse: separate;
-      border-spacing: 0;
-      width: 100%;
-      min-width: 760px;
-      background: #ffffff;
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-    }
-    .comparison-table thead th {
-      position: sticky;
-      top: 0;
-      background: #f0f3ff;
-      z-index: 3;
-      font-weight: 700;
-      padding: 12px 8px;
-      font-size: 0.9rem;
-    }
-    .comparison-table td:first-child,
-    .comparison-table th:first-child {
-      position: sticky;
-      left: 0;
-      background: #ffffff;
-      z-index: 2;
-    }
-    .comparison-table td {
-      padding: 14px 8px;
-      font-size: 0.95rem;
-    }
-    .modal-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.35);
-      display: flex;
-      justify-content: center;
-      align-items: flex-end;
-    }
-    .modal {
-      width: 100%;
-      max-width: 480px;
-      background: #f5f7fc;
-      border-radius: 18px 18px 0 0;
-      padding: 18px;
-      position: relative;
-      margin: 0 auto;
-    }
-    .modal-title {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 12px;
-    }
-    .hidden {
-      display: none;
-    }
-    .history-filter {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(2, auto);
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-    .history-filter label {
-      font-size: 0.8rem;
-      margin-bottom: 2px;
-      display: block;
-    }
-    .history-filter select {
-      width: 100%;
-      height: 48px;
-      padding: 10px;
-      border-radius: 10px;
-      border: 1px solid #c7d6ff;
-      background: #ffffff;
-      font-size: 0.9rem;
-    }
-    #historySearchBtn {
-      width: 100%;
-      height: 48px;
-      border-radius: 10px;
-      background: #4a6cff;
-      color: #fff;
-      font-size: 1rem;
-      font-weight: 700;
-      border: none;
-      margin-top: 4px;
-    }
-    .history-scroll {
-      overflow-x: auto;
-    }
-    .history-header-row {
-      background: #e6ecff;
-      padding: 8px;
-      font-size: 0.9rem;
-      font-weight: 700;
-      display: grid;
-      grid-template-columns: 96px 120px 80px 80px 80px 80px 80px 80px;
-      border-bottom: 1px solid #c7d6ff;
-      white-space: nowrap;
-    }
-    .history-row {
-      display: grid;
-      grid-template-columns: 96px 120px 80px 80px 80px 80px 80px 80px;
-      padding: 8px;
-      border-bottom: 1px solid #e3e7f5;
-      font-size: 0.9rem;
-    }
-    .text-input {
-      width: 100%;
-      padding: 10px;
-      border-radius: 10px;
-      border: 1px solid #c7d6ff;
-      background: #ffffff;
-      font-size: 1rem;
-      height: 48px;
-    }
-    #saveConfirmBtn {
-      width: 100%;
-      padding: 16px 0;
-      border-radius: 999px;
-      background: #ff4fa3;
-      color: #fff;
-      font-weight: 700;
-      font-size: 1.6rem;
-      border: none;
-      margin-top: 12px;
-    }
-    .close-btn {
-      width: 100%;
-      padding: 16px 0;
-      border-radius: 999px;
-      background: #e6ecff;
-      color: #4a6cff;
-      font-weight: 700;
-      font-size: 1.6rem;
-      border: none;
-      margin-top: 12px;
-    }
-    .help-btn {
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      border: none;
-      background: #e6ecff;
-      color: #4a6cff;
-      font-weight: 700;
-    }
-    .help-text {
-      font-size: 0.85rem;
-      background: #ffffff;
-      border-radius: 8px;
-      padding: 8px;
-      margin-bottom: 10px;
-      border: 1px solid #c7d6ff;
-    }
+    body { margin:0; padding:0; background:#ffffff; font-family:"Noto Sans JP",sans-serif; color:#333; overflow-x:hidden; }
+    .main-container { padding:12px 16px 16px 16px; max-width:480px; margin:0 auto; }
+    .card { background:#f5f7fc; border-radius:16px; padding:16px; margin-bottom:16px; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+    .card-title { font-size:1rem; font-weight:700; margin-bottom:10px; }
+    #waveCanvas { width:75%; height:160px; background:#fff; border-radius:12px; box-shadow:inset 0 0 6px rgba(0,0,0,0.08); margin:0 auto; display:block; }
+    .rpm-grid, .speed-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:12px; margin-left:32px; }
+    .rpm-grid div, .speed-grid div { display:flex; flex-direction:column; font-size:0.9rem; }
+    .rpm-grid span:last-child, .speed-grid span:last-child { font-weight:700; margin-top:2px; text-align:right; font-size:1.2rem; }
+    .rpm-limit-box { margin:12px 0 16px 0; padding:12px; background:#fff; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.08); }
+    .rpm-limit-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .limit-slider { flex:1; margin:0 10px; accent-color:#4fa3ff; }
+    .limit-value { width:60px; text-align:right; font-size:0.9rem; }
+    .status-line { margin-top:12px; font-size:0.9rem; color:#666; }
+    .realtime-buttons-2row { margin-top:14px; display:flex; flex-direction:column; gap:12px; }
+    .btn-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+    .primary-btn, .secondary-btn { padding:14px 0; border-radius:999px; font-size:0.9rem; font-weight:700; border:none; }
+    .primary-btn { background:#ff4fa3; color:#fff; }
+    .secondary-btn { background:#e6ecff; color:#4a6cff; }
+    input[type="range"] { width:100%; -webkit-appearance:none; height:6px; border-radius:999px; background:#e3e7f5; outline:none; margin-top:10px; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance:none; width:42px; height:27px; background:#fff; border-radius:999px; border:2px solid #4a6cff; }
+    .comparison-wrapper { overflow-x:auto; padding-bottom:12px; margin-top:10px; }
+    .comparison-table { border-collapse:separate; border-spacing:0; width:100%; min-width:760px; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,0.06); }
+    .comparison-table thead th { position:sticky; top:0; background:#f0f3ff; z-index:3; font-weight:700; padding:12px 8px; font-size:0.9rem; }
+    .comparison-table td:first-child, .comparison-table th:first-child { position:sticky; left:0; background:#fff; z-index:2; }
+    .comparison-table td { padding:14px 8px; font-size:0.95rem; }
+    .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.35); display:flex; justify-content:center; align-items:flex-end; }
+    .modal { width:100%; max-width:480px; background:#f5f7fc; border-radius:18px 18px 0 0; padding:18px; position:relative; margin:0 auto; }
+    .modal-title { font-size:1.1rem; font-weight:700; margin-bottom:12px; }
+    .hidden { display:none; }
+    .history-filter { display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(2,auto); gap:10px; margin-bottom:8px; }
+    .history-filter label { font-size:0.8rem; margin-bottom:2px; display:block; }
+    .history-filter select { width:100%; height:48px; padding:10px; border-radius:10px; border:1px solid #c7d6ff; background:#fff; font-size:0.9rem; }
+    #historySearchBtn { width:100%; height:48px; border-radius:10px; background:#4a6cff; color:#fff; font-size:1rem; font-weight:700; border:none; margin-top:4px; }
+    .history-scroll { overflow-x:auto; }
+    .history-header-row { background:#e6ecff; padding:8px; font-size:0.9rem; font-weight:700; display:grid; grid-template-columns:96px 120px 80px 80px 80px 80px 80px 80px; border-bottom:1px solid #c7d6ff; white-space:nowrap; }
+    .history-row { display:grid; grid-template-columns:96px 120px 80px 80px 80px 80px 80px 80px; padding:8px; border-bottom:1px solid #e3e7f5; font-size:0.9rem; }
+    .text-input { width:100%; padding:10px; border-radius:10px; border:1px solid #c7d6ff; background:#fff; font-size:1rem; height:48px; }
+    #saveConfirmBtn, .close-btn { width:100%; padding:16px 0; border-radius:999px; font-weight:700; font-size:1.6rem; border:none; margin-top:12px; }
+    #saveConfirmBtn { background:#ff4fa3; color:#fff; }
+    .close-btn { background:#e6ecff; color:#4a6cff; }
+    .help-btn { position:absolute; top:12px; right:12px; width:32px; height:32px; border-radius:50%; border:none; background:#e6ecff; color:#4a6cff; font-weight:700; }
+    .help-text { font-size:0.85rem; background:#fff; border-radius:8px; padding:8px; margin-bottom:10px; border:1px solid #c7d6ff; }
   </style>
 </head>
 <body>
@@ -373,7 +128,7 @@
     </section>
   </div>
 
-  <!-- モーダル部分（履歴・保存・設定）は省略せずそのまま使用 -->
+  <!-- モーダル（履歴・保存・設定）は省略せず使用 -->
   <div id="historyModalBackdrop" class="modal-backdrop hidden">
     <div class="modal">
       <div class="modal-title">履歴一覧</div>
@@ -526,6 +281,7 @@
       canvas.height = 160 * dpr;
     }
 
+    // === 上限・下限を正しく機能させる重要部分 ===
     function drawFFT() {
       if (!analyser) return;
       analyser.getFloatFrequencyData(fftBuffer);
@@ -534,10 +290,11 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const nyquist = SAMPLE_RATE / 2;
-      const minRpm = parseInt(UI.rpmMinLimit.value, 10);
-      const maxRpm = parseInt(UI.rpmMaxLimit.value, 10);
+      const minRpm = parseInt(UI.rpmMinLimit.value, 10) || 0;
+      const maxRpm = parseInt(UI.rpmMaxLimit.value, 10) || 60000;
       const minHz = minRpm / 60;
       const maxHz = maxRpm / 60;
+
       const minIndex = Math.max(0, Math.floor(minHz / nyquist * fftBuffer.length));
       const maxIndex = Math.min(fftBuffer.length - 1, Math.floor(maxHz / nyquist * fftBuffer.length));
 
@@ -560,10 +317,11 @@
       analyser.getFloatFrequencyData(fftBuffer);
 
       const nyquist = SAMPLE_RATE / 2;
-      const minRpm = parseInt(UI.rpmMinLimit.value, 10);
-      const maxRpm = parseInt(UI.rpmMaxLimit.value, 10);
+      const minRpm = parseInt(UI.rpmMinLimit.value, 10) || 0;
+      const maxRpm = parseInt(UI.rpmMaxLimit.value, 10) || 60000;
       const minHz = minRpm / 60;
       const maxHz = maxRpm / 60;
+
       const minIndex = Math.max(0, Math.floor(minHz / nyquist * fftBuffer.length));
       const maxIndex = Math.min(fftBuffer.length - 1, Math.floor(maxHz / nyquist * fftBuffer.length));
 
@@ -666,12 +424,8 @@
     UI.resetBtn.addEventListener("click", () => {
       running = false;
       locked = false;
-      state.rpmNow = 0;
-      state.rpmMax = 0;
-      state.rpmMin = Infinity;
-      state.speedNow = 0;
-      state.speedTop = 0;
-      state.speedMin = Infinity;
+      state.rpmNow = 0; state.rpmMax = 0; state.rpmMin = Infinity;
+      state.speedNow = 0; state.speedTop = 0; state.speedMin = Infinity;
       UI.rpmNow.textContent = "--";
       UI.rpmMax.textContent = "--";
       UI.rpmMin.textContent = "--";
@@ -688,7 +442,6 @@
     UI.settingsBtn2.addEventListener("click", () => UI.settingsModal.classList.remove("hidden"));
     UI.closeSettings.addEventListener("click", () => UI.settingsModal.classList.add("hidden"));
 
-    // スライダー更新
     UI.rpmMinLimit.addEventListener("input", () => UI.rpmMinLimitValue.textContent = UI.rpmMinLimit.value);
     UI.rpmMaxLimit.addEventListener("input", () => UI.rpmMaxLimitValue.textContent = UI.rpmMaxLimit.value);
 
