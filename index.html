@@ -314,17 +314,17 @@
         <div><span>MIN</span><span id="speedMin">-- km/h</span></div>
       </div>
       <div class="rpm-limit-box">
-        <div class="rpm-limit-row">
-          <label>RPM表示下限</label>
-          <input id="rpmMinLimit" type="range" min="0" max="5000" value="5000">
-          <span id="rpmMinLimitValue">5000</span>
-        </div>
-        <div class="rpm-limit-row">
-          <label>RPM表示上限</label>
-          <input id="rpmMaxLimit" type="range" min="30000" max="80000" value="60000">
-          <span id="rpmMaxLimitValue">60000</span>
-        </div>
-      </div>
+  <div class="rpm-limit-row">
+    <label>RPM表示下限</label>
+    <input id="" type="range" min="0" max="5000" value="1000">
+    <span id="Value">1000</span>
+  </div>
+  <div class="rpm-limit-row">
+    <label>RPM表示上限</label>
+    <input id="rpmMaxLimit" type="range" min="20000" max="60000" value="40000">
+    <span id="rpmMaxLimitValue">40000</span>
+  </div>
+</div>
       <div id="statusLine" class="status-line">READY — 計測待機中</div>
       <div class="realtime-buttons-2row">
         <div class="btn-row">
@@ -486,9 +486,9 @@
       speedNow: document.getElementById("speedNow"),
       speedTop: document.getElementById("speedTop"),
       speedMin: document.getElementById("speedMin"),
-      rpmMinLimit: document.getElementById("rpmMinLimit"),
+      : document.getElementById(""),
       rpmMaxLimit: document.getElementById("rpmMaxLimit"),
-      rpmMinLimitValue: document.getElementById("rpmMinLimitValue"),
+      Value: document.getElementById("Value"),
       rpmMaxLimitValue: document.getElementById("rpmMaxLimitValue"),
       startBtn: document.getElementById("startBtn"),
       lockBtn: document.getElementById("lockBtn"),
@@ -545,20 +545,31 @@
       fftBuffer = new Float32Array(analyser.frequencyBinCount);
     }
 
-    function drawFFT() {
+        function drawFFT() {
       if (!analyser) return;
       analyser.getFloatFrequencyData(fftBuffer);
       const canvas = UI.waveCanvas;
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const nyquist = SAMPLE_RATE / 2;
+      const minRpm = parseInt(UI..value, 10);
+      const maxRpm = parseInt(UI.rpmMaxLimit.value, 10);
+      const minHz = minRpm / 60;
+      const maxHz = maxRpm / 60;
+
+      const minIndex = Math.floor(minHz / nyquist * fftBuffer.length);
+      const maxIndex = Math.floor(maxHz / nyquist * fftBuffer.length);
+
       ctx.beginPath();
       ctx.strokeStyle = "#4a6cff";
-      ctx.lineWidth = 2;
-      for (let x = 0; x < canvas.width; x++) {
-        const idx = Math.floor(x * fftBuffer.length / canvas.width);
-        const norm = Math.max(0, (fftBuffer[idx] + 120) / 120);
+      ctx.lineWidth = 2.5;
+
+      for (let i = Math.max(0, minIndex); i <= Math.min(fftBuffer.length - 1, maxIndex); i++) {
+        const x = (i - minIndex) / (maxIndex - minIndex + 1) * canvas.width;
+        const norm = Math.max(0, (fftBuffer[i] + 120) / 120);
         const y = canvas.height * (1 - norm);
-        if (x === 0) ctx.moveTo(x, y);
+        if (i === minIndex) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       }
       ctx.stroke();
@@ -567,16 +578,27 @@
     function detectPeak() {
       if (!analyser) return null;
       analyser.getFloatFrequencyData(fftBuffer);
+
       const nyquist = SAMPLE_RATE / 2;
+      const minRpm = parseInt(UI..value, 10);
+      const maxRpm = parseInt(UI.rpmMaxLimit.value, 10);
+      const minHz = minRpm / 60;
+      const maxHz = maxRpm / 60;
+
+      const minIndex = Math.max(0, Math.floor(minHz / nyquist * fftBuffer.length));
+      const maxIndex = Math.min(fftBuffer.length - 1, Math.floor(maxHz / nyquist * fftBuffer.length));
+
       let bestIndex = -1;
       let bestValue = -Infinity;
-      for (let i = 0; i < fftBuffer.length; i++) {
+
+      for (let i = minIndex; i <= maxIndex; i++) {
         if (fftBuffer[i] > bestValue) {
           bestValue = fftBuffer[i];
           bestIndex = i;
         }
       }
       if (bestIndex < 0) return null;
+
       return bestIndex * nyquist / fftBuffer.length;
     }
 
@@ -808,6 +830,12 @@
       UI.gearLabel.textContent = "4.0:1";
       UI.tireLabel.textContent = "26.0 mm";
     });
+    UI.rpmMinLimit.addEventListener("input", () => {
+  UI.rpmMinLimitValue.textContent = UI.rpmMinLimit.value;
+});
+UI.rpmMaxLimit.addEventListener("input", () => {
+  UI.rpmMaxLimitValue.textContent = UI.rpmMaxLimit.value;
+});
   </script>
 </body>
 </html>
