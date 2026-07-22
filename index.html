@@ -1,3 +1,5 @@
+０７２２−１０
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -5,9 +7,6 @@
   <title>RPM Analyzer — Advanced FFT</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
   <style>
-    /* =============================
-       全体レイアウト
-    ============================= */
     body {
       margin: 0;
       padding: 0;
@@ -299,7 +298,6 @@
 </head>
 <body>
   <div class="main-container">
-    <!-- FFT カード -->
     <section class="card">
       <div class="card-title">FFT Spectrum</div>
       <canvas id="waveCanvas"></canvas>
@@ -314,17 +312,17 @@
         <div><span>MIN</span><span id="speedMin">-- km/h</span></div>
       </div>
       <div class="rpm-limit-box">
-  <div class="rpm-limit-row">
-    <label>RPM表示下限</label>
-    <input id="" type="range" min="0" max="5000" value="1000">
-    <span id="Value">1000</span>
-  </div>
-  <div class="rpm-limit-row">
-    <label>RPM表示上限</label>
-    <input id="rpmMaxLimit" type="range" min="20000" max="60000" value="40000">
-    <span id="rpmMaxLimitValue">40000</span>
-  </div>
-</div>
+        <div class="rpm-limit-row">
+          <label>RPM表示下限</label>
+          <input id="rpmMinLimit" type="range" min="0" max="5000" value="1000">
+          <span id="rpmMinLimitValue">1000</span>
+        </div>
+        <div class="rpm-limit-row">
+          <label>RPM表示上限</label>
+          <input id="rpmMaxLimit" type="range" min="20000" max="60000" value="40000">
+          <span id="rpmMaxLimitValue">40000</span>
+        </div>
+      </div>
       <div id="statusLine" class="status-line">READY — 計測待機中</div>
       <div class="realtime-buttons-2row">
         <div class="btn-row">
@@ -340,7 +338,6 @@
       </div>
     </section>
 
-    <!-- 計測条件カード -->
     <section class="card">
       <div class="card-title">計測条件</div>
       <div class="setting-item">
@@ -360,7 +357,6 @@
       </div>
     </section>
 
-    <!-- 比較表カード -->
     <section class="card">
       <div class="card-title">電圧別比較表</div>
       <div class="comparison-wrapper">
@@ -385,7 +381,7 @@
     </section>
   </div>
 
-  <!-- 履歴モーダル -->
+  <!-- モーダル -->
   <div id="historyModalBackdrop" class="modal-backdrop hidden">
     <div class="modal">
       <div class="modal-title">履歴一覧</div>
@@ -407,7 +403,6 @@
     </div>
   </div>
 
-  <!-- 保存モーダル -->
   <div id="saveModalBackdrop" class="modal-backdrop hidden">
     <div class="modal">
       <div class="modal-title">保存</div>
@@ -423,7 +418,6 @@
     </div>
   </div>
 
-  <!-- 設定モーダル -->
   <div id="settingsModalBackdrop" class="modal-backdrop hidden">
     <div class="modal">
       <div class="modal-title">設定</div>
@@ -450,9 +444,6 @@
   </div>
 
   <script>
-    /* =============================
-       改善版集音機能 + 元の全機能
-    ============================= */
     const SAMPLE_RATE = 48000;
     const FFT_SIZE = 16384;
 
@@ -486,9 +477,9 @@
       speedNow: document.getElementById("speedNow"),
       speedTop: document.getElementById("speedTop"),
       speedMin: document.getElementById("speedMin"),
-      : document.getElementById(""),
+      rpmMinLimit: document.getElementById("rpmMinLimit"),
       rpmMaxLimit: document.getElementById("rpmMaxLimit"),
-      Value: document.getElementById("Value"),
+      rpmMinLimitValue: document.getElementById("rpmMinLimitValue"),
       rpmMaxLimitValue: document.getElementById("rpmMaxLimitValue"),
       startBtn: document.getElementById("startBtn"),
       lockBtn: document.getElementById("lockBtn"),
@@ -545,7 +536,14 @@
       fftBuffer = new Float32Array(analyser.frequencyBinCount);
     }
 
-        function drawFFT() {
+    function resizeCanvas() {
+      const canvas = UI.waveCanvas;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = canvas.clientWidth * dpr;
+      canvas.height = 160 * dpr;
+    }
+
+    function drawFFT() {
       if (!analyser) return;
       analyser.getFloatFrequencyData(fftBuffer);
       const canvas = UI.waveCanvas;
@@ -553,19 +551,18 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const nyquist = SAMPLE_RATE / 2;
-      const minRpm = parseInt(UI..value, 10);
+      const minRpm = parseInt(UI.rpmMinLimit.value, 10);
       const maxRpm = parseInt(UI.rpmMaxLimit.value, 10);
       const minHz = minRpm / 60;
       const maxHz = maxRpm / 60;
-
-      const minIndex = Math.floor(minHz / nyquist * fftBuffer.length);
-      const maxIndex = Math.floor(maxHz / nyquist * fftBuffer.length);
+      const minIndex = Math.max(0, Math.floor(minHz / nyquist * fftBuffer.length));
+      const maxIndex = Math.min(fftBuffer.length - 1, Math.floor(maxHz / nyquist * fftBuffer.length));
 
       ctx.beginPath();
       ctx.strokeStyle = "#4a6cff";
       ctx.lineWidth = 2.5;
 
-      for (let i = Math.max(0, minIndex); i <= Math.min(fftBuffer.length - 1, maxIndex); i++) {
+      for (let i = minIndex; i <= maxIndex; i++) {
         const x = (i - minIndex) / (maxIndex - minIndex + 1) * canvas.width;
         const norm = Math.max(0, (fftBuffer[i] + 120) / 120);
         const y = canvas.height * (1 - norm);
@@ -580,17 +577,15 @@
       analyser.getFloatFrequencyData(fftBuffer);
 
       const nyquist = SAMPLE_RATE / 2;
-      const minRpm = parseInt(UI..value, 10);
+      const minRpm = parseInt(UI.rpmMinLimit.value, 10);
       const maxRpm = parseInt(UI.rpmMaxLimit.value, 10);
       const minHz = minRpm / 60;
       const maxHz = maxRpm / 60;
-
       const minIndex = Math.max(0, Math.floor(minHz / nyquist * fftBuffer.length));
       const maxIndex = Math.min(fftBuffer.length - 1, Math.floor(maxHz / nyquist * fftBuffer.length));
 
       let bestIndex = -1;
       let bestValue = -Infinity;
-
       for (let i = minIndex; i <= maxIndex; i++) {
         if (fftBuffer[i] > bestValue) {
           bestValue = fftBuffer[i];
@@ -598,7 +593,6 @@
         }
       }
       if (bestIndex < 0) return null;
-
       return bestIndex * nyquist / fftBuffer.length;
     }
 
@@ -628,6 +622,7 @@
       const speedNow = computeSpeed(rpm, gearRatio, state.tireMm);
       const speedTop = computeSpeed(state.rpmMax, gearRatio, state.tireMm);
       const speedMin = computeSpeed(state.rpmMin, gearRatio, state.tireMm);
+
       state.speedNow = speedNow;
       state.speedTop = speedTop;
       state.speedMin = speedMin;
@@ -670,7 +665,7 @@
       requestAnimationFrame(loop);
     }
 
-    // イベントリスナー
+    // ボタン機能
     UI.startBtn.addEventListener("click", async () => {
       if (!audioContext) await initAudio();
       running = true;
@@ -682,10 +677,12 @@
     UI.lockBtn.addEventListener("click", () => {
       locked = !locked;
       UI.lockBtn.textContent = locked ? "ロック解除" : "ロック";
-      UI.statusLine.textContent = locked ? "LOCKED — 値固定中" : "MEASURING — 計測中";
+      UI.statusLine.textContent = locked ? "LOCKED — 停止中" : "MEASURING — 計測中";
     });
 
     UI.resetBtn.addEventListener("click", () => {
+      running = false;
+      locked = false;
       state.rpmNow = 0;
       state.rpmMax = 0;
       state.rpmMin = Infinity;
@@ -701,21 +698,6 @@
       UI.statusLine.textContent = "READY — 計測待機中";
     });
 
-    // 計測条件スライダー
-    UI.voltageRange.addEventListener("input", () => {
-      state.voltage = parseFloat(UI.voltageRange.value);
-      UI.voltageLabel.textContent = state.voltage.toFixed(1) + " V";
-    });
-    UI.gearRange.addEventListener("input", () => {
-      state.gearIndex = parseInt(UI.gearRange.value, 10);
-      UI.gearLabel.textContent = ["3.5:1","3.7:1","4.0:1","4.2:1","5.0:1","6.4:1","8.75:1","11.2:1"][state.gearIndex] || "4.0:1";
-    });
-    UI.tireRange.addEventListener("input", () => {
-      state.tireMm = parseFloat(UI.tireRange.value);
-      UI.tireLabel.textContent = state.tireMm.toFixed(1) + " mm";
-    });
-
-    // モーダル関連（簡易版）
     UI.historyBtn2.addEventListener("click", () => UI.historyModal.classList.remove("hidden"));
     UI.closeHistory.addEventListener("click", () => UI.historyModal.classList.add("hidden"));
     UI.saveBtn.addEventListener("click", () => UI.saveModal.classList.remove("hidden"));
@@ -723,119 +705,13 @@
     UI.settingsBtn2.addEventListener("click", () => UI.settingsModal.classList.remove("hidden"));
     UI.closeSettings.addEventListener("click", () => UI.settingsModal.classList.add("hidden"));
 
+    // スライダー更新
+    UI.rpmMinLimit.addEventListener("input", () => UI.rpmMinLimitValue.textContent = UI.rpmMinLimit.value);
+    UI.rpmMaxLimit.addEventListener("input", () => UI.rpmMaxLimitValue.textContent = UI.rpmMaxLimit.value);
+
     window.addEventListener('load', () => {
       resizeCanvas();
-      UI.voltageLabel.textContent = state.voltage.toFixed(1) + " V";
-      UI.gearLabel.textContent = "4.0:1";
-      UI.tireLabel.textContent = "26.0 mm";
     });
-      function computeSpeed(rpm, gearRatio, tireMm) {
-      const wheelRpm = rpm / gearRatio;
-      const tireM = tireMm / 1000;
-      const speedMps = wheelRpm * tireM * Math.PI / 60;
-      return speedMps * 3.6;
-    }
-
-    function updateRealtimeUI(rpm) {
-      if (!rpm || !isFinite(rpm)) return;
-      state.rpmNow = rpm;
-      state.rpmMax = Math.max(state.rpmMax, rpm);
-      state.rpmMin = Math.min(state.rpmMin, rpm);
-
-      const gearRatio = gearRatios[state.gearIndex] || 4.0;
-      const speedNow = computeSpeed(rpm, gearRatio, state.tireMm);
-      const speedTop = computeSpeed(state.rpmMax, gearRatio, state.tireMm);
-      const speedMin = computeSpeed(state.rpmMin, gearRatio, state.tireMm);
-
-      state.speedNow = speedNow;
-      state.speedTop = speedTop;
-      state.speedMin = speedMin;
-
-      UI.rpmNow.textContent = Math.round(state.rpmNow);
-      UI.rpmMax.textContent = Math.round(state.rpmMax);
-      UI.rpmMin.textContent = Math.round(state.rpmMin);
-      UI.speedNow.textContent = speedNow.toFixed(2) + " km/h";
-      UI.speedTop.textContent = speedTop.toFixed(2) + " km/h";
-      UI.speedMin.textContent = speedMin.toFixed(2) + " km/h";
-    }
-
-    function buildComparisonTable() {
-      if (!UI.comparisonBody) return;
-      UI.comparisonBody.innerHTML = "";
-      const voltages = [2.2, 2.4, 2.6, 2.8, 3.0, 3.2, 3.4];
-      voltages.forEach(v => {
-        const baseRpm = state.rpmNow || 30000;
-        const scale = v / state.voltage;
-        const rpm = baseRpm * scale;
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${v.toFixed(1)} V</td><td>${Math.round(rpm)}</td>`;
-        gearRatios.forEach(gr => {
-          const sp = computeSpeed(rpm, gr, state.tireMm).toFixed(2);
-          tr.innerHTML += `<td>${sp}</td>`;
-        });
-        UI.comparisonBody.appendChild(tr);
-      });
-    }
-
-    function loop() {
-      if (!running || locked) {
-        requestAnimationFrame(loop);
-        return;
-      }
-      drawFFT();
-      const peakHz = detectPeak();
-      const rpm = computeRpm(peakHz);
-      updateRealtimeUI(rpm);
-      buildComparisonTable();
-      requestAnimationFrame(loop);
-    }
-
-    // ボタンイベント
-    UI.startBtn.addEventListener("click", async () => {
-      if (!audioContext) {
-        await initAudio();
-      }
-      running = true;
-      locked = false;
-      UI.statusLine.textContent = "MEASURING — 計測中";
-      loop();
-    });
-
-    UI.lockBtn.addEventListener("click", () => {
-      locked = !locked;
-      UI.lockBtn.textContent = locked ? "ロック解除" : "ロック";
-      UI.statusLine.textContent = locked ? "LOCKED — 値固定中" : "MEASURING — 計測中";
-    });
-
-    UI.resetBtn.addEventListener("click", () => {
-      state.rpmNow = 0;
-      state.rpmMax = 0;
-      state.rpmMin = Infinity;
-      state.speedNow = 0;
-      state.speedTop = 0;
-      state.speedMin = Infinity;
-      UI.rpmNow.textContent = "--";
-      UI.rpmMax.textContent = "--";
-      UI.rpmMin.textContent = "--";
-      UI.speedNow.textContent = "-- km/h";
-      UI.speedTop.textContent = "-- km/h";
-      UI.speedMin.textContent = "-- km/h";
-      UI.statusLine.textContent = "READY — 計測待機中";
-    });
-
-    // スライダー初期化
-    window.addEventListener('load', () => {
-      resizeCanvas(); // 必要なら追加
-      UI.voltageLabel.textContent = state.voltage.toFixed(1) + " V";
-      UI.gearLabel.textContent = "4.0:1";
-      UI.tireLabel.textContent = "26.0 mm";
-    });
-    UI.rpmMinLimit.addEventListener("input", () => {
-  UI.rpmMinLimitValue.textContent = UI.rpmMinLimit.value;
-});
-UI.rpmMaxLimit.addEventListener("input", () => {
-  UI.rpmMaxLimitValue.textContent = UI.rpmMaxLimit.value;
-});
   </script>
 </body>
 </html>
